@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: svg2eps-converter
+    env: python
+    buildCommand: "apt-get install -y libcairo2 && pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    plan: free
