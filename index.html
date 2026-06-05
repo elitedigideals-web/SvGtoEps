@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#ffcc50">
+<title>SVG → EPS Converter</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    color: #e8e0d0;
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+  .grid-bg {
+    position: fixed; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255,200,80,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,200,80,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .container { max-width: 600px; width: 100%; position: relative; z-index: 1; }
+  header {
+    display: flex; align-items: center; gap: 14px;
+    border-bottom: 1px solid rgba(255,200,80,0.2);
+    padding-bottom: 20px; margin-bottom: 30px; margin-top: 20px;
+  }
+  .icon {
+    width: 44px; height: 44px;
+    border: 2px solid #ffcc50;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; color: #ffcc50; flex-shrink: 0;
+  }
+  h1 { font-size: 20px; color: #ffcc50; letter-spacing: 0.1em; }
+  .sub { font-size: 11px; color: #888; letter-spacing: 0.08em; }
+
+  .drop-zone {
+    border: 2px dashed rgba(255,200,80,0.3);
+    background: rgba(255,255,255,0.02);
+    min-height: 180px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 12px; cursor: pointer;
+    transition: all 0.2s; margin-bottom: 16px;
+    padding: 20px;
+  }
+  .drop-zone.drag { border-color: #ffcc50; background: rgba(255,200,80,0.05); }
+  .drop-zone.has-file { border-color: rgba(127,255,127,0.4); }
+  .drop-icon { font-size: 40px; color: rgba(255,200,80,0.3); }
+  .drop-text { font-size: 13px; color: #666; letter-spacing: 0.08em; text-align: center; }
+  .file-name { font-size: 13px; color: #7fff7f; }
+
+  .settings {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px; margin-bottom: 16px;
+  }
+  .setting-box {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,200,80,0.15);
+    padding: 12px;
+  }
+  label { font-size: 10px; color: #888; letter-spacing: 0.1em; display: block; margin-bottom: 6px; }
+  select, input[type=number] {
+    width: 100%; background: transparent;
+    border: none; color: #ffcc50;
+    font-family: 'Courier New', monospace;
+    font-size: 13px; outline: none;
+  }
+  option { background: #0a0a0f; }
+
+  .convert-btn {
+    width: 100%; padding: 16px;
+    background: rgba(255,200,80,0.1);
+    border: 1px solid rgba(255,200,80,0.4);
+    color: #ffcc50; font-family: 'Courier New', monospace;
+    font-size: 14px; letter-spacing: 0.15em;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .convert-btn:hover { background: rgba(255,200,80,0.2); }
+  .convert-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .convert-btn.success {
+    background: rgba(127,255,127,0.1);
+    border-color: rgba(127,255,127,0.4);
+    color: #7fff7f;
+  }
+
+  .status {
+    margin-top: 14px; padding: 12px 16px;
+    font-size: 12px; display: none;
+  }
+  .status.show { display: block; }
+  .status.loading { border: 1px solid rgba(255,200,80,0.2); color: #ffcc50; }
+  .status.error { border: 1px solid rgba(255,80,80,0.3); color: #ff8080; }
+  .status.done { border: 1px solid rgba(127,255,127,0.3); color: #7fff7f; }
+
+  .install-bar {
+    margin-top: 30px; padding: 14px 16px;
+    background: rgba(255,200,80,0.05);
+    border: 1px solid rgba(255,200,80,0.2);
+    display: none; align-items: center;
+    gap: 12px; flex-wrap: wrap;
+  }
+  .install-bar.show { display: flex; }
+  .install-btn {
+    background: #ffcc50; color: #0a0a0f;
+    border: none; padding: 8px 18px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px; letter-spacing: 0.1em;
+    cursor: pointer; font-weight: bold;
+  }
+  .install-text { font-size: 11px; color: #aaa; flex: 1; }
+
+  #file-input { display: none; }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="container">
+  <header>
+    <div class="icon">▲</div>
+    <div>
+      <h1>SVG → EPS CONVERTER</h1>
+      <div class="sub">CAIROSVG · SHUTTERSTOCK READY</div>
+    </div>
+  </header>
+
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-icon">⬡</div>
+    <div class="drop-text" id="dropText">SVG FILE DROP කරන්න<br>හෝ CLICK කරන්න</div>
+    <div class="file-name" id="fileName"></div>
+  </div>
+  <input type="file" id="file-input" accept=".svg">
+
+  <div class="settings">
+    <div class="setting-box">
+      <label>OUTPUT WIDTH (PX)</label>
+      <input type="number" id="outWidth" value="5000" min="100" max="20000">
+    </div>
+    <div class="setting-box">
+      <label>OUTPUT HEIGHT (PX)</label>
+      <input type="number" id="outHeight" value="5000" min="100" max="20000">
+    </div>
+  </div>
+
+  <button class="convert-btn" id="convertBtn" disabled>
+    ▶ CONVERT TO EPS
+  </button>
+
+  <div class="status" id="status"></div>
+
+  <div class="install-bar" id="installBar">
+    <div class="install-text">📱 App එක Phone එකේ Install කරන්න</div>
+    <button class="install-btn" id="installBtn">INSTALL APP</button>
+  </div>
+</div>
+
+<script>
+let selectedFile = null;
+let deferredPrompt = null;
+
+// PWA Install
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBar').classList.add('show');
+});
+
+document.getElementById('installBtn').addEventListener('click', async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      document.getElementById('installBar').style.display = 'none';
+    }
+    deferredPrompt = null;
+  }
+});
+
+// Drop Zone
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('click', () => fileInput.click());
+
+dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dropZone.classList.add('drag');
+});
+
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('drag');
+  setFile(e.dataTransfer.files[0]);
+});
+
+fileInput.addEventListener('change', (e) => setFile(e.target.files[0]));
+
+function setFile(file) {
+  if (!file || !file.name.endsWith('.svg')) {
+    showStatus('SVG file ඕනේ!', 'error');
+    return;
+  }
+  selectedFile = file;
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('dropText').textContent = '';
+  dropZone.classList.add('has-file');
+  document.getElementById('convertBtn').disabled = false;
+  hideStatus();
+}
+
+// Convert
+document.getElementById('convertBtn').addEventListener('click', async () => {
+  if (!selectedFile) return;
+
+  const btn = document.getElementById('convertBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Converting...';
+  showStatus('Converting... මදක් ඉන්න...', 'loading');
+
+  const formData = new FormData();
+  formData.append('file', selectedFile);
+  formData.append('width', document.getElementById('outWidth').value);
+  formData.append('height', document.getElementById('outHeight').value);
+
+  try {
+    const res = await fetch('/convert', { method: 'POST', body: formData });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Server error');
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = selectedFile.name.replace('.svg', '.eps');
+    a.click();
+    URL.revokeObjectURL(url);
+
+    showStatus('✅ EPS Download වෙනවා!', 'done');
+    btn.textContent = '✓ CONVERTED!';
+    btn.classList.add('success');
+    setTimeout(() => {
+      btn.textContent = '▶ CONVERT TO EPS';
+      btn.classList.remove('success');
+      btn.disabled = false;
+    }, 3000);
+
+  } catch (err) {
+    showStatus('❌ Error: ' + err.message, 'error');
+    btn.textContent = '▶ CONVERT TO EPS';
+    btn.disabled = false;
+  }
+});
+
+function showStatus(msg, type) {
+  const s = document.getElementById('status');
+  s.textContent = msg;
+  s.className = 'status show ' + type;
+}
+function hideStatus() {
+  document.getElementById('status').className = 'status';
+}
+
+// Register SW
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
+}
+</script>
+</body>
+</html>
